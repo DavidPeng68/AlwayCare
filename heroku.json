@@ -1,0 +1,22 @@
+{
+  "name": "alwayscare-child-safety",
+  "description": "AI-powered child safety detection application",
+  "repository": "https://github.com/yourusername/alwayscare-child-safety",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "express", "react", "ai", "child-safety"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment",
+      "value": "production"
+    },
+    "JWT_SECRET": {
+      "description": "JWT Secret for authentication",
+      "generator": "secret"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}
