@@ -8,4 +8,12 @@ module.exports = function (app) {
       changeOrigin: true,
     })
   );
+
+  app.use(
+    "/uploads",
+    createProxyMiddleware({
+      target: "http://localhost:5050",
+      changeOrigin: true,
+    })
+  );
 };

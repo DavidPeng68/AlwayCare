@@ -93,6 +93,7 @@ async function startServer() {
     // Process pending images every 30 seconds
     schedule.scheduleJob("*/30 * * * * *", async () => {
       try {
+        console.log("[JOB] tick", new Date().toISOString());
         await processPendingImages();
       } catch (error) {
         console.error("Background processing error:", error);
