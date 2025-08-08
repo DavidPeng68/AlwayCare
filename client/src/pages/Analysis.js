@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { FaChartBar, FaShieldAlt, FaExclamationTriangle, FaCheck, FaClock, FaTimes } from 'react-icons/fa';
-import { motion } from 'framer-motion';
-import axios from 'axios';
-import toast from 'react-hot-toast';
-import API_BASE_URL from '../config';
-import { getImageUrl } from '../utils/imageUtils';
-import './Analysis.css';
+import React, { useState, useEffect } from "react";
+import {
+  FaChartBar,
+  FaShieldAlt,
+  FaExclamationTriangle,
+  FaCheck,
+  FaClock,
+  FaTimes,
+} from "react-icons/fa";
+import { motion } from "framer-motion";
+import api from "../api";
+import toast from "react-hot-toast";
+import { getImageUrl } from "../utils/imageUtils";
+import "./Analysis.css";
 
 const Analysis = () => {
   const [analyses, setAnalyses] = useState([]);
@@ -13,91 +19,134 @@ const Analysis = () => {
   const [loading, setLoading] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
 
+  // Fetch initial data and start polling
   useEffect(() => {
-    fetchAnalyses();
-    fetchStats();
+    fetchAll();
+    // Poll every 5 seconds to keep UI fresh as background jobs complete
+    const id = setInterval(fetchAll, 5000);
+    return () => clearInterval(id);
   }, []);
 
+  const fetchAll = async () => {
+    await Promise.all([fetchAnalyses(), fetchStats()]);
+  };
+
+  // Fetch completed analyses
   const fetchAnalyses = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/api/analysis/completed`);
-      setAnalyses(response.data.analyses || []);
+      const { data } = await api.get("/api/analysis/completed");
+      // Expecting data.analyses (array). Fallback to [] if not present.
+      setAnalyses(data?.analyses || []);
     } catch (error) {
-      console.error('Error fetching analyses:', error);
-      toast.error('Failed to load analyses');
+      console.error("Error fetching analyses:", error);
+      toast.error("Failed to load analyses");
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch aggregated analysis statistics
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/analysis/stats`);
-      setStats(response.data);
+      const { data } = await api.get("/api/analysis/stats");
+      setStats(data || {});
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error("Error fetching stats:", error);
+      // Stats are optional; no toast to avoid noise.
     }
   };
 
+  // Map risk level to an icon
   const getRiskLevelIcon = (riskLevel) => {
     switch (riskLevel) {
-      case 'none':
+      case "none":
         return <FaCheck className="risk-icon safe" />;
-      case 'low':
+      case "low":
         return <FaShieldAlt className="risk-icon low" />;
-      case 'medium':
+      case "medium":
         return <FaExclamationTriangle className="risk-icon medium" />;
-      case 'high':
+      case "high":
         return <FaExclamationTriangle className="risk-icon high" />;
       default:
         return <FaClock className="risk-icon" />;
     }
   };
 
-  // Risk level color mapping (unused but kept for future use)
-  // const getRiskLevelColor = (riskLevel) => {
-  //   switch (riskLevel) {
-  //     case 'none':
-  //       return '#28a745';
-  //     case 'low':
-  //       return '#ffc107';
-  //     case 'medium':
-  //       return '#fd7e14';
-  //     case 'high':
-  //       return '#dc3545';
-  //     default:
-  //       return '#6c757d';
-  //   }
-  // };
-
+  // Safely format timestamps
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
+    if (!dateString) return "-";
+    const d = new Date(dateString);
+    return isNaN(d.getTime()) ? "-" : d.toLocaleString();
   };
 
+  // Normalize analysis object fields (snake_case vs camelCase)
+  const normalizeAnalysis = (a) => {
+    if (!a) return {};
+    return {
+      id: a.id ?? a.image_id ?? a.analysis_id,
+      filename: a.filename,
+      originalFilename:
+        a.original_filename ?? a.originalName ?? a.original_filename,
+      uploadTimestamp: a.upload_timestamp ?? a.uploadTimestamp,
+      riskLevel: a.risk_level ?? a.riskLevel,
+      riskDescription: a.risk_description ?? a.riskDescription,
+      detectedObjects: a.detectedObjects ?? a.detected_objects ?? [],
+      confidenceScores: a.confidenceScores ?? a.confidence_scores ?? null,
+    };
+  };
+
+  // Render the list of detected objects
   const renderDetectedObjects = (detectedObjects) => {
-    console.log('Rendering detected objects:', detectedObjects);
-    
-    if (!detectedObjects || detectedObjects.length === 0) {
+    const list = detectedObjects || [];
+    if (!Array.isArray(list) || list.length === 0) {
       return <p className="no-objects">No objects detected</p>;
     }
 
     return (
       <div className="detected-objects">
-        {detectedObjects.map((obj, index) => {
-          console.log('Object:', obj);
+        {list.map((obj, index) => {
+          const name = obj?.name ?? "Unknown";
+          // Confidence may be 0~1 or already percentage; assume 0~1 and convert
+          const conf =
+            typeof obj?.confidence === "number"
+              ? (obj.confidence * 100).toFixed(1)
+              : "0";
           return (
-            <div key={index} className="detected-object">
-              <span className="object-name">{obj.name || 'Unknown'}</span>
-              <span className="object-confidence">
-                {obj.confidence ? (obj.confidence * 100).toFixed(1) : '0'}%
-              </span>
+            <div key={`${name}-${index}`} className="detected-object">
+              <span className="object-name">{name}</span>
+              <span className="object-confidence">{conf}%</span>
             </div>
           );
         })}
       </div>
     );
   };
+
+  // Pull safe numbers from stats with graceful fallbacks
+  const getTotalsFromStats = () => {
+    const statusDist =
+      stats?.statusDistribution || stats?.status_distribution || [];
+    const riskDist = stats?.riskDistribution || stats?.risk_distribution || [];
+
+    const totalCompleted =
+      statusDist.find((s) => (s.analysis_status ?? s.status) === "completed")
+        ?.count || 0;
+    const totalPending =
+      statusDist.find((s) => (s.analysis_status ?? s.status) === "pending")
+        ?.count || 0;
+
+    const safeCount =
+      riskDist.find((r) => (r.risk_level ?? r.level) === "none")?.count || 0;
+    const hazardsCount = (
+      riskDist.filter((r) => (r.risk_level ?? r.level) !== "none") || []
+    ).reduce((sum, r) => sum + (r.count || 0), 0);
+
+    return { totalCompleted, totalPending, safeCount, hazardsCount };
+  };
+
+  const { totalCompleted, totalPending, safeCount, hazardsCount } =
+    getTotalsFromStats();
 
   return (
     <div className="analysis">
@@ -107,6 +156,7 @@ const Analysis = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
+          {/* Header */}
           <div className="analysis-header">
             <h1>Analysis Results</h1>
             <p>View detailed safety analysis of your uploaded images</p>
@@ -120,9 +170,7 @@ const Analysis = () => {
                 <FaChartBar className="stat-icon" />
                 <div className="stat-content">
                   <h3>Total Analyses</h3>
-                  <p className="stat-number">
-                    {stats.statusDistribution?.find(s => s.analysis_status === 'completed')?.count || 0}
-                  </p>
+                  <p className="stat-number">{totalCompleted}</p>
                 </div>
               </div>
 
@@ -130,9 +178,7 @@ const Analysis = () => {
                 <FaShieldAlt className="stat-icon" />
                 <div className="stat-content">
                   <h3>Safe Environments</h3>
-                  <p className="stat-number">
-                    {stats.riskDistribution?.find(r => r.risk_level === 'none')?.count || 0}
-                  </p>
+                  <p className="stat-number">{safeCount}</p>
                 </div>
               </div>
 
@@ -140,10 +186,7 @@ const Analysis = () => {
                 <FaExclamationTriangle className="stat-icon" />
                 <div className="stat-content">
                   <h3>Hazards Detected</h3>
-                  <p className="stat-number">
-                    {(stats.riskDistribution?.filter(r => r.risk_level !== 'none') || [])
-                      .reduce((sum, r) => sum + r.count, 0)}
-                  </p>
+                  <p className="stat-number">{hazardsCount}</p>
                 </div>
               </div>
 
@@ -151,9 +194,7 @@ const Analysis = () => {
                 <FaClock className="stat-icon" />
                 <div className="stat-content">
                   <h3>Pending Analysis</h3>
-                  <p className="stat-number">
-                    {stats.statusDistribution?.find(s => s.analysis_status === 'pending')?.count || 0}
-                  </p>
+                  <p className="stat-number">{totalPending}</p>
                 </div>
               </div>
             </div>
@@ -162,7 +203,7 @@ const Analysis = () => {
           {/* Analyses List */}
           <div className="analyses-section">
             <h2>Recent Analyses</h2>
-            
+
             {loading ? (
               <div className="loading-container">
                 <FaClock className="loading-spinner" />
@@ -176,60 +217,65 @@ const Analysis = () => {
               </div>
             ) : (
               <div className="analyses-grid">
-                {analyses.map((analysis) => (
-                  <motion.div
-                    key={analysis.id}
-                    className="analysis-card"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                    onClick={() => {
-                      console.log('Selected analysis:', analysis);
-                      setSelectedAnalysis(analysis);
-                    }}
-                  >
-                    <div className="analysis-preview">
-                      <img
-                        src={getImageUrl(`uploads/${analysis.filename}`)}
-                        alt={analysis.original_filename}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
-                        }}
-                      />
-                      <div className="image-placeholder">
-                        <FaChartBar />
-                      </div>
-                    </div>
-
-                    <div className="analysis-info">
-                      <h4>{analysis.original_filename}</h4>
-                      <p className="analysis-time">
-                        {formatDate(analysis.upload_timestamp)}
-                      </p>
-
-                      <div className="risk-assessment">
-                        {getRiskLevelIcon(analysis.risk_level)}
-                        <div className="risk-details">
-                          <span className={`risk-level ${analysis.risk_level}`}>
-                            {analysis.risk_level?.toUpperCase() || 'UNKNOWN'}
-                          </span>
-                          {analysis.risk_description && (
-                            <p className="risk-description">
-                              {analysis.risk_description}
-                            </p>
-                          )}
+                {analyses.map((raw) => {
+                  const a = normalizeAnalysis(raw);
+                  return (
+                    <motion.div
+                      key={a.id}
+                      className="analysis-card"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                      onClick={() => setSelectedAnalysis(a)}
+                    >
+                      <div className="analysis-preview">
+                        <img
+                          src={getImageUrl(`uploads/${a.filename}`)}
+                          alt={a.originalFilename}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                            e.currentTarget.nextSibling.style.display = "flex";
+                          }}
+                        />
+                        <div className="image-placeholder">
+                          <FaChartBar />
                         </div>
                       </div>
 
-                      {analysis.detectedObjects && (
-                        <div className="detected-objects-summary">
-                          <strong>Detected:</strong> {analysis.detectedObjects.length} objects
+                      <div className="analysis-info">
+                        <h4>{a.originalFilename}</h4>
+                        <p className="analysis-time">
+                          {formatDate(a.uploadTimestamp)}
+                        </p>
+
+                        <div className="risk-assessment">
+                          {getRiskLevelIcon(a.riskLevel)}
+                          <div className="risk-details">
+                            <span
+                              className={`risk-level ${
+                                a.riskLevel || "unknown"
+                              }`}
+                            >
+                              {(a.riskLevel || "UNKNOWN").toUpperCase()}
+                            </span>
+                            {a.riskDescription && (
+                              <p className="risk-description">
+                                {a.riskDescription}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
+
+                        {Array.isArray(a.detectedObjects) && (
+                          <div className="detected-objects-summary">
+                            <strong>Detected:</strong>{" "}
+                            {a.detectedObjects.length} objects
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -238,13 +284,16 @@ const Analysis = () => {
 
       {/* Analysis Detail Modal */}
       {selectedAnalysis && (
-        <div className="modal-overlay" onClick={() => setSelectedAnalysis(null)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setSelectedAnalysis(null)}
+        >
           <motion.div
             className="modal-content"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()} // prevent overlay close on inner click
           >
             <div className="modal-header">
               <h2>Analysis Details</h2>
@@ -260,10 +309,10 @@ const Analysis = () => {
               <div className="analysis-image">
                 <img
                   src={getImageUrl(`uploads/${selectedAnalysis.filename}`)}
-                  alt={selectedAnalysis.original_filename}
+                  alt={selectedAnalysis.originalFilename}
                   onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
+                    e.currentTarget.style.display = "none";
+                    e.currentTarget.nextSibling.style.display = "flex";
                   }}
                 />
                 <div className="image-placeholder">
@@ -272,22 +321,26 @@ const Analysis = () => {
               </div>
 
               <div className="analysis-details">
-                <h3>{selectedAnalysis.original_filename}</h3>
+                <h3>{selectedAnalysis.originalFilename}</h3>
                 <p className="analysis-time">
-                  Analyzed on {formatDate(selectedAnalysis.upload_timestamp)}
+                  Analyzed on {formatDate(selectedAnalysis.uploadTimestamp)}
                 </p>
 
                 <div className="risk-summary">
                   <div className="risk-header">
-                    {getRiskLevelIcon(selectedAnalysis.risk_level)}
-                    <span className={`risk-level ${selectedAnalysis.risk_level}`}>
-                      {selectedAnalysis.risk_level?.toUpperCase() || 'UNKNOWN'}
+                    {getRiskLevelIcon(selectedAnalysis.riskLevel)}
+                    <span
+                      className={`risk-level ${
+                        selectedAnalysis.riskLevel || "unknown"
+                      }`}
+                    >
+                      {(selectedAnalysis.riskLevel || "UNKNOWN").toUpperCase()}
                     </span>
                   </div>
-                  
-                  {selectedAnalysis.risk_description && (
+
+                  {selectedAnalysis.riskDescription && (
                     <div className="risk-description-full">
-                      {selectedAnalysis.risk_description}
+                      {selectedAnalysis.riskDescription}
                     </div>
                   )}
                 </div>
@@ -301,17 +354,20 @@ const Analysis = () => {
                   <div className="confidence-scores">
                     <h4>Confidence Scores</h4>
                     <div className="confidence-grid">
-                      {Object.entries(selectedAnalysis.confidenceScores).map(([object, data]) => {
-                        console.log('Confidence score:', object, data);
-                        return (
-                          <div key={object} className="confidence-item">
-                            <span className="object-name">{object}</span>
-                            <span className="confidence-value">
-                              {data && data.confidence ? (data.confidence * 100).toFixed(1) : '0'}%
-                            </span>
-                          </div>
-                        );
-                      })}
+                      {Object.entries(selectedAnalysis.confidenceScores).map(
+                        ([object, data]) => {
+                          const conf =
+                            typeof data?.confidence === "number"
+                              ? (data.confidence * 100).toFixed(1)
+                              : "0";
+                          return (
+                            <div key={object} className="confidence-item">
+                              <span className="object-name">{object}</span>
+                              <span className="confidence-value">{conf}%</span>
+                            </div>
+                          );
+                        }
+                      )}
                     </div>
                   </div>
                 )}
