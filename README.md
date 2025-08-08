@@ -68,7 +68,7 @@ The system can detect various hazards including:
 3. **Create environment file**
    ```bash
    # Create .env file in root directory
-   echo "PORT=5000
+   echo "PORT=5050
    NODE_ENV=development
    JWT_SECRET=your-secret-key-here
    CLIENT_URL=http://localhost:3000" > .env
@@ -81,7 +81,7 @@ The system can detect various hazards including:
 
 5. **Access the application**
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
+   - Backend API: http://localhost:5050
 
 ### Demo Account
 - **Username**: admin

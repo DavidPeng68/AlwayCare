@@ -38,7 +38,7 @@ cd ..
 Create a `.env` file in the root directory:
 ```env
 # Server Configuration
-PORT=5000
+PORT=5050
 NODE_ENV=development
 
 # JWT Configuration
@@ -68,7 +68,7 @@ npm run client
 
 ### 1. Access the Application
 - Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
+- Backend API: http://localhost:5050
 
 ### 2. Demo Account
 You can use the default demo account:
