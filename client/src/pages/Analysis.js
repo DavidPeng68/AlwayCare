@@ -193,12 +193,22 @@ const Analysis = () => {
                         src={getImageUrl(`uploads/${analysis.filename}`)}
                         alt={analysis.original_filename}
                         onError={(e) => {
+                          console.error('Image failed to load:', e.target.src);
+                          console.error('Full URL:', getImageUrl(`uploads/${analysis.filename}`));
+                          // Don't hide the image immediately, let the placeholder show
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'flex';
                         }}
+                        onLoad={(e) => {
+                          console.log('Image loaded successfully:', e.target.src);
+                          e.target.style.display = 'block';
+                          e.target.nextSibling.style.display = 'none';
+                        }}
+                        style={{ display: 'block' }}
                       />
-                      <div className="image-placeholder">
+                      <div className="image-placeholder" style={{ display: 'none' }}>
                         <FaChartBar />
+                        <p>Image not available</p>
                       </div>
                     </div>
 
@@ -262,12 +272,21 @@ const Analysis = () => {
                   src={getImageUrl(`uploads/${selectedAnalysis.filename}`)}
                   alt={selectedAnalysis.original_filename}
                   onError={(e) => {
+                    console.error('Modal image failed to load:', e.target.src);
+                    console.error('Full URL:', getImageUrl(`uploads/${selectedAnalysis.filename}`));
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
                   }}
+                  onLoad={(e) => {
+                    console.log('Modal image loaded successfully:', e.target.src);
+                    e.target.style.display = 'block';
+                    e.target.nextSibling.style.display = 'none';
+                  }}
+                  style={{ display: 'block' }}
                 />
-                <div className="image-placeholder">
+                <div className="image-placeholder" style={{ display: 'none' }}>
                   <FaChartBar />
+                  <p>Image not available</p>
                 </div>
               </div>
 

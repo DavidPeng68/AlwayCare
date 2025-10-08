@@ -198,12 +198,18 @@ const Dashboard = () => {
                           src={getImageUrl(`uploads/${image.filename}`)}
                           alt={image.originalName}
                           onError={(e) => {
+                            console.error('Dashboard image failed to load:', e.target.src);
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'flex';
+                          }}
+                          onLoad={(e) => {
+                            e.target.style.display = 'block';
+                            e.target.nextSibling.style.display = 'none';
                           }}
                         />
                         <div className="image-placeholder">
                           <FaImage />
+                          <p>Image not available</p>
                         </div>
                       </div>
                       
