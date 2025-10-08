@@ -32,8 +32,10 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Create database connection
-const db = new sqlite3.Database(dbPath);
+// Create database connection (only if not using in-memory DB)
+if (!useInMemoryDB && db) {
+  // db already created above in the try-catch block
+}
 
 // Initialize database tables
 async function initDatabase() {
@@ -187,14 +189,22 @@ function allQuery(sql, params = []) {
 
 // Close database connection
 function closeDatabase() {
+  if (useInMemoryDB) {
+    return Promise.resolve();
+  }
+  
   return new Promise((resolve, reject) => {
-    db.close((err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
+    if (db) {
+      db.close((err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    } else {
+      resolve();
+    }
   });
 }
 
