@@ -34,7 +34,7 @@
 
 ## Test the Backend:
 
-Visit: `https://your-backend-url.onrender.com/api/health`
+Visit: `https://alwaycare.onrender.com/api/health`
 
 Should return: `{"status":"OK","message":"AlwayCare server is running"}`
 

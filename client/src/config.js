@@ -1,7 +1,7 @@
 // API Configuration
 const API_CONFIG = {
   development: 'http://localhost:5000',
-  production: process.env.REACT_APP_API_BASE_URL || 'https://your-backend-url.onrender.com'
+  production: process.env.REACT_APP_API_BASE_URL || 'https://alwaycare.onrender.com'
 };
 
 // Get the current environment
