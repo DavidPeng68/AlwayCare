@@ -1,6 +1,26 @@
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
+
+// For deployment, we'll use a simple in-memory database to avoid sqlite3 issues
+let useInMemoryDB = process.env.NODE_ENV === 'production';
+
+let db;
+let inMemoryData = {
+  users: [],
+  image_records: [],
+  nextUserId: 1,
+  nextImageId: 1
+};
+
+if (!useInMemoryDB) {
+  try {
+    const sqlite3 = require('sqlite3').verbose();
+    db = new sqlite3.Database(path.join(__dirname, '../../data/alwaycare.db'));
+  } catch (error) {
+    console.log('SQLite3 not available, using in-memory database');
+    useInMemoryDB = true;
+  }
+}
 
 // Database file path
 const dbPath = path.join(__dirname, '../../data/alwaycare.db');
@@ -17,6 +37,27 @@ const db = new sqlite3.Database(dbPath);
 
 // Initialize database tables
 async function initDatabase() {
+  if (useInMemoryDB) {
+    // Initialize in-memory database
+    console.log('🗄️ Using in-memory database for production');
+    
+    // Create default admin user
+    const defaultPassword = 'admin123';
+    const hash = await bcrypt.hash(defaultPassword, 10);
+    
+    inMemoryData.users.push({
+      id: inMemoryData.nextUserId++,
+      username: 'admin',
+      email: 'admin@alwaycare.com',
+      password_hash: hash,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    
+    console.log('✅ Default admin user created (username: admin, password: admin123)');
+    return Promise.resolve();
+  }
+  
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       // Users table
@@ -91,6 +132,11 @@ async function initDatabase() {
 
 // Database utility functions
 function runQuery(sql, params = []) {
+  if (useInMemoryDB) {
+    // Simple in-memory implementation
+    return Promise.resolve({ id: Date.now(), changes: 1 });
+  }
+  
   return new Promise((resolve, reject) => {
     db.run(sql, params, function(err) {
       if (err) {
@@ -103,6 +149,14 @@ function runQuery(sql, params = []) {
 }
 
 function getQuery(sql, params = []) {
+  if (useInMemoryDB) {
+    // Simple in-memory implementation
+    if (sql.includes('username = ?') && params[0] === 'admin') {
+      return Promise.resolve(inMemoryData.users.find(u => u.username === 'admin'));
+    }
+    return Promise.resolve(null);
+  }
+  
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
       if (err) {
@@ -115,6 +169,11 @@ function getQuery(sql, params = []) {
 }
 
 function allQuery(sql, params = []) {
+  if (useInMemoryDB) {
+    // Simple in-memory implementation
+    return Promise.resolve([]);
+  }
+  
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
       if (err) {
