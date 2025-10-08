@@ -70,11 +70,24 @@ app.get("/", (req, res) => {
 
 // Serve React app in production
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../client/build")));
+  const clientBuildPath = path.join(__dirname, "../client/build");
+  
+  // Check if build directory exists
+  if (fs.existsSync(clientBuildPath)) {
+    app.use(express.static(clientBuildPath));
 
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../client/build", "index.html"));
-  });
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(clientBuildPath, "index.html"));
+    });
+  } else {
+    // If no build files, serve a simple message
+    app.get("*", (req, res) => {
+      res.json({ 
+        message: "AlwayCare API is running. Frontend build not found.",
+        api: "Available at /api endpoints"
+      });
+    });
+  }
 }
 
 // Create uploads directory if it doesn't exist

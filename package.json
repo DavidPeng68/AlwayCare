@@ -10,7 +10,9 @@
     "dev": "concurrently \"npm run server:dev\" \"npm run client\"",
     "server:dev": "nodemon server/index.js",
     "build": "cd client && npm run build",
-    "install-all": "npm install && cd client && npm install"
+    "install-all": "npm install && cd client && npm install",
+    "build-all": "npm run install-all && npm run build",
+    "start:production": "node server/index.js"
   },
   "keywords": ["child-safety", "ai", "computer-vision", "web-app"],
   "author": "AlwayCare Team",
